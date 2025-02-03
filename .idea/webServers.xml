@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="036152b0-9e9a-4f36-b7c3-972ac0a42fc5" name="sdgpu">
+        <fileTransfer rootFolder="/taiga/hdpriest" accessType="SFTP" host="sd-gpu.ncsa.illinois.edu" port="22" sshConfigId="61258ff6-7546-4d9c-b697-ca0e3c8495af" sshConfig="hdpriest@sd-gpu.ncsa.illinois.edu:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

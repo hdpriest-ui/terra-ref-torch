@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig authType="PASSWORD" host="sd-gpu.ncsa.illinois.edu" id="61258ff6-7546-4d9c-b697-ca0e3c8495af" port="22" nameFormat="DESCRIPTIVE" username="hdpriest" useOpenSSHConfig="true" />
+    </configs>
+  </component>
+</project>
