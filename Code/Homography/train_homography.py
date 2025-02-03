@@ -63,7 +63,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 # get sets of images - with X overlap, y overlap, corner overlap, data loaded into py tensors
 #
 #
-# 
+#
 #
 #
 
