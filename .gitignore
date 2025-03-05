@@ -1,0 +1,4 @@
+/TrainingRuns
+*.pyc
+/Code/Homography/__pycache__
+Code/Homography/__pycache__/models.cpython-312.pyc

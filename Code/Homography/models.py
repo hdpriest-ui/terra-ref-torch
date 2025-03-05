@@ -7,33 +7,34 @@ def device():
 
 
 class HomographyFeatureExtractor(nn.Module):
-    def __init__(self):
+    def __init__(self, batch_size=1):
         super().__init__()
         # block 1
-        self.conv1a = nn.Conv2d(3, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.batch_size = batch_size
+        self.conv1a = nn.Conv2d(1, 64, kernel_size=(5, 5), stride=1, padding=2)
         self.act1a = nn.ReLU()
-        self.conv1b = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv1b = nn.Conv2d(64, 64, kernel_size=(5, 5), stride=1, padding=2)
         self.act1b = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # block 2
-        self.conv2a = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv2a = nn.Conv2d(64, 64, kernel_size=(5, 5), stride=1, padding=2)
         self.act2a = nn.ReLU()
-        self.conv2b = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv2b = nn.Conv2d(64, 64, kernel_size=(5, 5), stride=1, padding=2)
         self.act2b = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # block 3
-        self.conv3a = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv3a = nn.Conv2d(64, 128, kernel_size=(5, 5), stride=1, padding=2)
         self.act3a = nn.ReLU()
-        self.conv3b = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv3b = nn.Conv2d(128, 128, kernel_size=(5, 5), stride=1, padding=2)
         self.act3b = nn.ReLU()
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # block 4
-        self.conv4a = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv4a = nn.Conv2d(128, 128, kernel_size=(5, 5), stride=1, padding=2)
         self.act4a = nn.ReLU()
-        self.conv4b = nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv4b = nn.Conv2d(128, 128, kernel_size=(5, 5), stride=1, padding=2)
         self.act4b = nn.ReLU()
 
     def forward(self, x):
@@ -52,15 +53,16 @@ class HomographyFeatureExtractor(nn.Module):
         return x
 
 class HomographyEstimator(nn.Module):
-    def __init__(self):
+    def __init__(self, batch_size=1):
         super().__init__()
         search_range = 16
         input_dims = (search_range * 2 + 1)**2
-        self.conv1 = nn.Conv2d(in_channels=input_dims, out_channels=512, kernel_size=(3, 3), stride=1, padding=1)
+        self.batch_size = batch_size
+        self.conv1 = nn.Conv2d(in_channels=input_dims, out_channels=512, kernel_size=(5, 5), stride=1, padding=2)
         self.act1 = nn.ReLU()
-        self.conv2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(5, 5), stride=1, padding=2)
         self.act2 = nn.ReLU()
-        self.conv3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), stride=1, padding=1)
+        self.conv3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(5, 5), stride=1, padding=2)
         self.act3 = nn.ReLU()
 
         self.flat = nn.Flatten()
@@ -96,17 +98,15 @@ class HomographyEstimator(nn.Module):
         return cost_vol
 
     def forward(self, inputs_a, inputs_b):
-        extractor_a = HomographyFeatureExtractor().to(device())
-        extractor_b = HomographyFeatureExtractor().to(device())
-        # greyscale, i think
-        # feature extraction
-        feature_a = extractor_a.forward(torch.mean(input=inputs_a, dim=1, keepdim=True).expand(1, 3, 128, 128))
-        feature_b = extractor_b.forward(torch.mean(input=inputs_b, dim=1, keepdim=True).expand(1, 3, 128, 128))
+        extractor_a = HomographyFeatureExtractor(batch_size=self.batch_size).to(device())
+        extractor_b = HomographyFeatureExtractor(batch_size=self.batch_size).to(device())
+        feature_a = extractor_a.forward(torch.mean(input=inputs_a, dim=1, keepdim=True))
+        feature_b = extractor_b.forward(torch.mean(input=inputs_b, dim=1, keepdim=True))
         search_range = 16
         # compute overlap
         global_correlation = self.cost_volume(nn.functional.normalize(feature_a, p=2, dim=1), nn.functional.normalize(feature_b, p=2, dim=1), search_range)
 
-        # input 3x32x32, output 32x32x32
+        # uh, no, not true: input 3x32x32, output 32x32x32
         x = self.act1(self.conv1(global_correlation))
         x = self.act2(self.conv2(x))
         x = self.act3(self.conv3(x))
@@ -115,17 +115,5 @@ class HomographyEstimator(nn.Module):
         x = self.drop1(x)
         x = self.fc2(x)
 
-        # x = self.drop1(x)
-        # # input 32x32x32, output 32x32x32
-        # x = self.act2(self.conv2(x))
-        # # input 32x32x32, output 32x16x16
-        # x = self.pool2(x)
-        # # input 32x16x16, output 8192
-        # x = self.flat(x)
-        # # input 8192, output 512
-        # x = self.act3(self.fc3(x))
-        # x = self.drop3(x)
-        # # input 512, output 10
-        # x = self.fc4(x)
         return x
 
