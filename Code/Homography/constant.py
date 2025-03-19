@@ -18,12 +18,15 @@ def get_dir(directory):
 
 
 def parser_args():
+    default_epsilon = 1e-8
+    default_gradient_clip = 2.0
+    default_batch = 1
     parser = argparse.ArgumentParser(description='Options to run the network.')
     parser.add_argument('-g', '--gpu', type=str, default='0',
                         help='the device id of gpu.')
-    parser.add_argument('-i', '--iters', type=int, default=1,
+    parser.add_argument('-i', '--iters', type=int,
                         help='set the number of iterations, default is 1')
-    parser.add_argument('-b', '--batch', type=int, default=1,
+    parser.add_argument('-b', '--batch', type=int, default=default_batch,
                         help='set the batch size, default is 4.')
     parser.add_argument('--train_folder', type=str, default='',
                         help='set the training folder path.')
@@ -33,6 +36,10 @@ def parser_args():
                         help='set the output root folder path.')
     parser.add_argument('--checkpoint', type=str,
                         help='identifies a checkpoint file to load - optional.')
+    parser.add_argument('--epsilon', type=float, default=default_epsilon, help='epsilon set value for optimizer')
+    parser.add_argument('--learning_rate', type=float, help='learning rate set for optimizer')
+    parser.add_argument('--gradient_clip', type=float, default=default_gradient_clip,
+                        help='gradient clip set for training loop')
     # parser.add_argument('--snapshot_dir', type=str, default='',
     #                     help='if it is folder, then it is the directory to save models, '
     #                          'if it is a specific model.ckpt-xxx, then the system will load it for testing.')
@@ -76,16 +83,21 @@ const.GPU = args.gpu
 
 const.BATCH_SIZE = args.batch
 const.ITERATIONS = args.iters
+const.EPSILON = args.epsilon
+const.LEARNING_RATE = args.learning_rate
+const.GRADIENT_CLIP = args.gradient_clip
 
-const.OUTPUT_ROOT = Path(get_dir(args.output_root))
+
+
+const.OUTPUT_ROOT = get_dir(args.output_root)
 if args.checkpoint:
     const.CHECKPOINT  = Path(const.CHECKPOINT)
 else:
     const.CHECKPOINT  = False
-summary_base = get_dir(Path(const.OUTPUT_ROOT, "summary"))
-snapshot_base = get_dir(Path(const.OUTPUT_ROOT, "snapshot"))
-const.SUMMARY_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "summary", "homography")))
-const.SNAPSHOT_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "snapshot", "homography")))
+summary_base = get_dir(Path(const.OUTPUT_ROOT + "-summary"))
+snapshot_base = get_dir(Path(const.OUTPUT_ROOT + "-snapshot"))
+const.SUMMARY_DIR = Path(get_dir(Path(const.OUTPUT_ROOT + "-summary", "homography")))
+const.SNAPSHOT_DIR = Path(get_dir(Path(const.OUTPUT_ROOT + "-snapshot", "homography")))
 
 # const.SNAPSHOT_DIR = get_dir(args.snapshot_dir)
 # const.SUMMARY_DIR = get_dir(args.summary_dir)
