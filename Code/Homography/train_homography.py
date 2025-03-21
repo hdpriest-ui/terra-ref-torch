@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.multiprocessing as mp
+from sympy.vector import gradient
 from torch.utils.data import DataLoader
 from constant import const
 from pathlib import Path
@@ -91,49 +92,30 @@ def main():
     iter_update_number = 1000
     epoch_max = 5000
     current_iter = 0
+    min_validation_loss = np.inf
     HomographyModel.train()
     w_previous = None
-    # print(HomographyModel.state_dict())
     for epoch in range(epoch_max):
         if current_iter >= const.ITERATIONS:
             break
         print(f"Beginning epoch: {epoch}")
-        # print(list(HomographyModel.parameters()))
         for i, (images, labels) in enumerate(train_dataloader):
             # Move tensors to the configured device
             if current_iter >= const.ITERATIONS:
                 break
             image_a = images[1]
             image_b = images[0]
-            # labels = torch.mean(input=labels, dim=2, keepdim=False)
             image_a = image_a.to(device())
             image_b = image_b.to(device())
             labels = labels.to(device())
 
-            # optimizer.zero_grad() #### ADDED THIS I HAVE NO IDEA IF IT RIGHT
-            # Forward pass
             outputs, training_warp_gt = HomographyModel(image_a, image_b, labels)
-
             labels = torch.mean(labels, dim=2)
             loss = criterion(outputs.flatten(), labels.flatten())
-
-            # Backward and optimize
-                 ### REMOVED THIS
             loss.backward()
+            if gradient_clip_level is not None:
+                torch.nn.utils.clip_grad_norm_(HomographyModel.parameters(), gradient_clip_level)
 
-            # w = HomographyModel.conv1._parameters['weight'].detach()
-            # if w_previous is None:
-            #     w_previous = w.clone()
-            # print(f"Conv1: {(w-w_previous).abs().sum()}")
-            # w_previous = w.clone()
-            # gradient clipping present in nie approach to (by their annotation) avoid dividing by zero.
-            # necessary here?
-            # for param in HomographyModel.parameters():
-            #     print(param.grad)
-            # for p in HomographyModel.parameters():
-            #     print('gradient param:{}'.format(p.grad))
-            # torch.nn.utils.clip_grad_norm_(HomographyModel.parameters(), gradient_clip_level)
-            # torch.nn.utils.clip_grad_value_(HomographyModel.parameters(), gradient_clip_level)
             optimizer.step()
             optimizer.zero_grad()
 
@@ -145,11 +127,40 @@ def main():
                 print(f"Saving model at iteration: {current_iter}")
                 torch.save({
                     'iteration': current_iter,
+                    'epoch': epoch,
                     'model_state_dict': HomographyModel.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                 }, str(Path(const.SNAPSHOT_DIR, "homography_checkpoint.pth")))
             current_iter = current_iter + 1
+
+        validation_loss = 0.0
+        HomographyModel.eval()
+        with torch.no_grad():
+            for i, (images, labels) in enumerate(test_dataloader):
+                image_a = images[1]
+                image_b = images[0]
+                image_a = image_a.to(device())
+                image_b = image_b.to(device())
+                labels = labels.to(device())
+
+                outputs, test_warp_gt = HomographyModel(image_a, image_b, labels)
+                labels = torch.mean(labels, dim=2)
+                loss = criterion(outputs.flatten(), labels.flatten())
+                validation_loss += loss.item()
+            mean_validation_loss = validation_loss / total_step
+            print(f'Epoch {epoch} Validation Loss: {validation_loss / total_step}')
+            if validation_loss < min_validation_loss:
+
+                print(f'Overall validation loss improved: {validation_loss:.6f} < {min_validation_loss:.6f}')
+                torch.save({
+                    'iteration': current_iter,
+                    'epoch': epoch,
+                    'model_state_dict': HomographyModel.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': validation_loss / total_step,
+                }, str(Path(const.SNAPSHOT_DIR, f"homography_checkpoint_epoch{epoch}.pth")))
+                min_validation_loss = validation_loss
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')

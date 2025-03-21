@@ -19,7 +19,7 @@ def get_dir(directory):
 
 def parser_args():
     default_epsilon = 1e-8
-    default_gradient_clip = 2.0
+    default_gradient_clip = None
     default_batch = 1
     parser = argparse.ArgumentParser(description='Options to run the network.')
     parser.add_argument('-g', '--gpu', type=str, default='0',
