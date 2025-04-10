@@ -3,10 +3,6 @@ import argparse
 from pathlib import Path
 from PIL import Image
 import glob
-import logging
-
-# Add this line to define the log level
-LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for more detailed logs
 
 
 # def get_dir(directory):
@@ -54,8 +50,6 @@ def parser_args():
                         help='Learning rate for the optimizer. Default is 0.001.')
     parser.add_argument('--gradient_clip', type=float, default=None,
                         help='Gradient clipping value. Default is None (no clipping).')
-    parser.add_argument('--homography_checkpoint', type=str, default=None,
-                        help='Required path to homography output checkpoint file.')
     return parser.parse_args()
 
 
@@ -126,9 +120,10 @@ const.BATCH_SIZE = args.batch_size
 const.ITERATION = args.iteration
 const.LEARNING_RATE = args.learning_rate
 const.GRADIENT_CLIP = args.gradient_clip
-const.HOMOGRAPHY_CHECKPOINT = args.homography_checkpoint
+
 # Dynamically determine image size
 const.HEIGHT, const.WIDTH = determine_image_size(const.TRAINING_DATA_DIRECTORY)
+print("LOADING CONSTANTS FROM STITCHING CONSTANTS")
 # Output directories
 const.OUTPUT_ROOT = Path(str(args.output_root))
 const.SUMMARY_DIR = Path(str(Path(const.OUTPUT_ROOT, "summary")))

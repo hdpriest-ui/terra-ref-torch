@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torch as torch
-import os, sys
-sys.path.append(os.path.dirname(__file__))
+
 from tensorDLT import solve_DLT
 from spatial_transform import transform
 import numpy as np
@@ -170,34 +169,32 @@ class HomographyEstimator(nn.Module):
         x = self.fc2(x)
         return x
 
-    def forward(self, inputs_a, inputs_b, label, is_stitching, patch_size=128.):
+    def forward(self, inputs_a, inputs_b, label, patch_size=128.):
         # unsure what patch size parameterization supports:
         # i expect it represents the input size and the area of the overlaid two inputs for homography estimation
         batch_size = inputs_a.shape[0]
         predicted_shift = self.build_model(inputs_a, inputs_b)
         # predicted_shift = predicted_shift.unsqueeze(2)
-        if not is_stitching:
-            homography_gt = solve_DLT(label, patch_size)
-            homography_gt = homography_gt.to(device())
-            homography_gt_inverse = homography_gt
 
-            # high risk operation here. implementing linear alg. methods i don't fully understand.
-            M = np.array([[patch_size / 2.0, 0., patch_size / 2.0],
-                        [0., patch_size / 2.0, patch_size / 2.0],
-                        [0., 0., 1.]]).astype(np.float32)
+        homography_gt = solve_DLT(label, patch_size)
+        homography_gt = homography_gt.to(device())
+        homography_gt_inverse = homography_gt
 
-            M_tensor = torch.from_numpy(M)
-            M_tile = torch.tile(torch.unsqueeze(M_tensor, 0), dims=[batch_size, 1, 1])
-            M_tensor_inverse = torch.inverse(M_tensor)
-            M_tile_inverse = torch.tile(torch.unsqueeze(M_tensor_inverse, 0), dims=[batch_size, 1, 1])
-            M_tile_inverse=M_tile_inverse.to(device())
-            M_tile=M_tile.to(device())
-            homography_gt_inverse=homography_gt_inverse.to(device())
-            step1 = torch.matmul(M_tile_inverse, homography_gt_inverse)
-            step1.to(device())
-            homography_gt_mat = torch.matmul(step1, M_tile)
-            warp_gt = transform(inputs_b, homography_gt_mat) # validated identical
-            return predicted_shift, warp_gt
-        else:
-            return predicted_shift, None
+        # high risk operation here. implementing linear alg. methods i don't fully understand.
+        M = np.array([[patch_size / 2.0, 0., patch_size / 2.0],
+                      [0., patch_size / 2.0, patch_size / 2.0],
+                      [0., 0., 1.]]).astype(np.float32)
+
+        M_tensor = torch.from_numpy(M)
+        M_tile = torch.tile(torch.unsqueeze(M_tensor, 0), dims=[batch_size, 1, 1])
+        M_tensor_inverse = torch.inverse(M_tensor)
+        M_tile_inverse = torch.tile(torch.unsqueeze(M_tensor_inverse, 0), dims=[batch_size, 1, 1])
+        M_tile_inverse=M_tile_inverse.to(device())
+        M_tile=M_tile.to(device())
+        homography_gt_inverse=homography_gt_inverse.to(device())
+        step1 = torch.matmul(M_tile_inverse, homography_gt_inverse)
+        step1.to(device())
+        homography_gt_mat = torch.matmul(step1, M_tile)
+        warp_gt = transform(inputs_b, homography_gt_mat) # validated identical
+        return predicted_shift, warp_gt
 

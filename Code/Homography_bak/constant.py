@@ -88,6 +88,7 @@ const.LEARNING_RATE = args.learning_rate
 const.GRADIENT_CLIP = args.gradient_clip
 
 
+print("LOADING CONSTANTS FROM homography CONSTANTS")
 const.OUTPUT_ROOT = get_dir(args.output_root)
 if args.checkpoint:
     const.CHECKPOINT  = Path(const.CHECKPOINT)

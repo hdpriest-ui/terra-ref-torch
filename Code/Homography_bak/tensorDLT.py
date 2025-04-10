@@ -135,9 +135,6 @@ def solve_DLT(pre_4pt_shift, patch_size=128.):
     pts_1_tile = torch.tensor([[0., 0., patch_size, 0., 0., patch_size, patch_size, patch_size],], dtype=torch.float32)
     pts_1_tile = torch.tile(pts_1_tile.unsqueeze(2), (batch_size, 1, 1))
     pts_1_tile.to(device())
-    if pre_4pt_shift.shape == torch.Size([batch_size, 8]):
-        pre_4pt_shift = torch.reshape(pre_4pt_shift, [batch_size, 8, 1])
-
     pred_pts_2_tile = torch.add(pre_4pt_shift, pts_1_tile)
 
     # change the oder of original pt4 and predicted pt4 (so that we can get the inverse matrix of H simply)

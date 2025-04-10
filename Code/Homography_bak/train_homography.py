@@ -109,7 +109,7 @@ def main():
             image_b = image_b.to(device())
             labels = labels.to(device())
 
-            outputs, training_warp_gt = HomographyModel(image_a, image_b, labels, is_stitching=False)
+            outputs, training_warp_gt = HomographyModel(image_a, image_b, labels)
             labels = torch.mean(labels, dim=2)
             loss = criterion(outputs.flatten(), labels.flatten())
             loss.backward()
@@ -144,7 +144,7 @@ def main():
                 image_b = image_b.to(device())
                 labels = labels.to(device())
 
-                outputs, test_warp_gt = HomographyModel(image_a, image_b, labels, is_stitching=False)
+                outputs, test_warp_gt = HomographyModel(image_a, image_b, labels)
                 labels = torch.mean(labels, dim=2)
                 loss = criterion(outputs.flatten(), labels.flatten())
                 validation_loss += loss.item()
