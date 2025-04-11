@@ -15,9 +15,9 @@ class StructureStitchingLayer:
         rep = rep.float()
         x = x.float()
         x_flat = x.reshape([-1, 1])
-        x = torch.matmul(x_flat, rep.t())
-        x = x.int()
-        return x.reshape([-1])
+        repeated_flattened_x = torch.matmul(x_flat, rep.t())
+        repeated_flattened_x = repeated_flattened_x.int()
+        return repeated_flattened_x.reshape([-1])
 
     @staticmethod
     def _interpolate(im, x, y, out_size):
@@ -87,17 +87,15 @@ class StructureStitchingLayer:
     def _meshgrid(image, height, width):
         """Creates a grid of coordinates."""
         # Calculate the shift needed to center the image
-        shift_x = (width - image.shape[3]) / 2.0
-        shift_y = (height - image.shape[2]) / 2.0
-        
+        shift = (width - image.shape[3]) / 2.0
         device = image.device
         
         # Create x coordinates with centering
         x_t = torch.matmul(torch.ones(height, 1, device=device),
-                        torch.linspace(-shift_x, width - shift_x, width, device=device).unsqueeze(0))
+                        torch.linspace(-shift, width - shift, width, device=device).unsqueeze(0))
         
         # Create y coordinates with centering
-        y_t = torch.matmul(torch.linspace(-shift_y, height - shift_y, height, device=device).unsqueeze(1),
+        y_t = torch.matmul(torch.linspace(-shift, height - shift, height, device=device).unsqueeze(1),
                         torch.ones(1, width, device=device))
         
         x_t_flat = x_t.reshape([1, -1])
@@ -169,11 +167,10 @@ class StructureStitchingLayer:
         H_one = torch.eye(3, device=inputs.device)
         H_one = H_one.unsqueeze(0).repeat(batch_size, 1, 1)
 
-        img1 = inputs[:, :3, :, :]
+        img1 = inputs[:, :3, :, :] + 1
         img1_tf = StructureStitchingLayer._transform(img1, H_one, target_height, target_width)
         
-        # Step 2: Transform second image with input homography
-        warp = inputs[:, 3:, :, :]
+        warp = inputs[:, 3:, :, :] + 1
         warp_tf = StructureStitchingLayer._transform(warp, H, target_height, target_width)
         
         # Step 3: Create masks and combine images
@@ -194,6 +191,10 @@ class StructureStitchingLayer:
             warp_tf * mask2_only +  # Second image only
             0.5 * (img1_tf + warp_tf) * overlap  # Overlap region
         )
+        
+        img1_tf = img1_tf - 1
+        warp_tf = warp_tf - 1
+        structureStitching = structureStitching - 1
         
         # Step 4: Concatenate results
         output = torch.cat([img1_tf, warp_tf, structureStitching], dim=1)

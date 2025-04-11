@@ -7,7 +7,10 @@ from Stitching.models.unet import UNet
 from Stitching.models.SSL import StructureStitchingLayer
 from Homography.tensorDLT import solve_DLT
 from Homography.models import HomographyEstimator
+from stitch_logger import get_logger
 
+# Initialize logger
+logger = get_logger(__name__)
 
 # class HomographyEstimator(nn.Module):
 #     """
@@ -46,6 +49,7 @@ class StitchingModel(nn.Module):
     def _load_homography_estimator(self, model_path=None):
         # Load Homography Estimator model
         if model_path is not None:
+            logger.info(f"Loading homography model from checkpoint: {model_path}")
             homography_model = HomographyEstimator(batch_size=self.batch_size)
             homography_checkpoint = torch.load(model_path)
             homography_model.load_state_dict(homography_checkpoint["model_state_dict"])
