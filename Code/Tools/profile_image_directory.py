@@ -36,7 +36,7 @@ def process_directory(input_dir):
     total_data = {'widths': [], 'heights': [], 'pixels': []}
     
     # Supported image extensions
-    image_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.bmp'}
+    image_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.tif'}
     
     # Walk through the directory
     for root, _, files in os.walk(input_dir):

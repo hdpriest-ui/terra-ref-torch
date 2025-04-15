@@ -74,7 +74,8 @@ class StitchingModel(nn.Module):
         H = solve_DLT(shift, patch_size=max(self.height, self.width))
 
         # Step 4: Apply the homography transformation using SSL
-        coarse_stitched = StructureStitchingLayer.apply(inputs, H, self.stitched_height, self.stitched_width)
+        # coarse_stitched = StructureStitchingLayer.apply(inputs, H, self.stitched_height, self.stitched_width)
+        coarse_stitched = StructureStitchingLayer(inputs, H, self.stitched_height, self.stitched_width)
 
         # Step 5: Pass the coarse-stitched output and input2 to the U-Net
         refined_output = self.unet(coarse_stitched)

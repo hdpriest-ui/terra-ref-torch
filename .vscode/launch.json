@@ -4,14 +4,30 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "homography-train-debug-python",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hdpriest/Projects/Code/terra-ref-torch/Code/Homography/train_homography.py",
+            "console": "integratedTerminal",
+            "args": "--train_folder /taiga/hdpriest/Data/Terra-ref/training-DEV --test_folder /taiga/hdpriest/Data/Terra-ref/testing-DEV --output_root /taiga/hdpriest/Projects/Terra-ref/Torch_Stitching_debug_02  --gpu 0 --batch 4 --epsilon 0.00005 --learning_rate 0.00005 --iters 200"
+        },
+        {
+            "name": "homography-testing-debug-python",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hdpriest/Projects/Code/terra-ref-torch/Code/exploration/test_homography.py ",
+            "console": "integratedTerminal",
+            "args": "--model_path /taiga/hdpriest/Projects/Terra-ref/Torch_Test_50000iters_b128_lr5e-5_LargeEps5e-5_CorrectLink-snapshot/homography/homography_checkpoint_epoch77.pth --tile_dir /taiga/hdpriest/Data/Terra-ref/testing_small/input1 --ref_tile /taiga/hdpriest/Data/Terra-ref/testing_small/input1/000500.jpg --output_dir /taiga/hdpriest/Projects/Terra-ref/TestHomography"
+        },
+        {
+            "name": "stitch-train-debug-python",
             "type": "debugpy",
             "request": "launch",
             "program": "/home/hdpriest/Projects/Code/terra-ref-torch/Code/Stitching/train.py",
             "console": "integratedTerminal",
-            "args": "-g 0 --iteration 200 --batch_size 4 --training_data_directory /taiga/hdpriest/Data/Terra-ref/training-DEV --test_data_directory /taiga/hdpriest/Data/Terra-ref/testing-DEV --learning_rate 0.00005 --homography_checkpoint /taiga/hdpriest/Projects/Terra-ref/Torch_Test_50000iters_b128_lr5e-5_LargeEps5e-5_CorrectLink-snapshot/homography/homography_checkpoint_epoch77.pth --output_root /taiga/hdpriest/Projects/Terra-ref/Torch_Stitching_debug_02"
+            "args": "-g 0 --iteration 200 --batch_size 1 --training_data_directory /taiga/hdpriest/Data/Terra-ref/training-DEV --test_data_directory /taiga/hdpriest/Data/Terra-ref/testing-DEV --learning_rate 0.00005 --output_root /taiga/hdpriest/Projects/Terra-ref/Torch_Stitching_debug_02",
+            "old_args": "-g 0 --iteration 200 --batch_size 4 --training_data_directory /taiga/hdpriest/Data/Terra-ref/training-DEV --test_data_directory /taiga/hdpriest/Data/Terra-ref/testing-DEV --learning_rate 0.00005 --homography_checkpoint /taiga/hdpriest/Projects/Terra-ref/Torch_Test_50000iters_b128_lr5e-5_LargeEps5e-5_CorrectLink-snapshot/homography/homography_checkpoint_epoch77.pth --output_root /taiga/hdpriest/Projects/Terra-ref/Torch_Stitching_debug_02"
         }
     ]
 }
