@@ -44,7 +44,7 @@ class StitchingModel(nn.Module):
         self.stitched_width = target_width
         self.batch_size = batch_size
         self.h_estimator = self._load_homography_estimator(model_path=homography_model)
-        self.unet = UNet(in_channels=9, out_channels=3)
+        self.unet = UNet(in_channels=9, base_features=128, out_channels=3)
         
     def _load_homography_estimator(self, model_path=None):
         # Load Homography Estimator model

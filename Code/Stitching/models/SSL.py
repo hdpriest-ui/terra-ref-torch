@@ -1,9 +1,51 @@
+"""
+Structure Stitching Layer (SSL) implementation for image processing.
+
+This module implements a structure-aware image stitching layer that combines two images
+using a homography transformation. The layer performs bilinear interpolation and handles
+edge cases for seamless image stitching.
+
+The implementation uses PyTorch for efficient tensor operations and supports batch processing.
+"""
+
 import torch
 import torch.nn.functional as F
 import numpy as np
+from typing import Tuple, Optional
 
-def StructureStitchingLayer(inputs, H_tf, target_height, target_width):
-    def _repeat(x, n_repeats):
+def StructureStitchingLayer(inputs: torch.Tensor, H_tf: torch.Tensor, 
+                          target_height: int, target_width: int) -> torch.Tensor:
+    """
+    Structure Stitching Layer that combines two images using homography transformation.
+    
+    This function implements a structure-aware image stitching algorithm that:
+    1. Transforms the first image using identity transformation
+    2. Transforms the second image using the provided homography
+    3. Creates masks for valid regions in both images
+    4. Blends the images using weighted masks
+    
+    Args:
+        inputs (torch.Tensor): Input tensor of shape [batch_size, 6, height, width]
+            containing two concatenated images (3 channels each)
+        H_tf (torch.Tensor): Homography transformation matrix of shape [batch_size, 3, 3]
+        target_height (int): Desired output height
+        target_width (int): Desired output width
+        
+    Returns:
+        torch.Tensor: Stitched output tensor of shape [batch_size, 9, target_height, target_width]
+            containing the transformed first image, transformed second image, and the stitched result
+    """
+    def _repeat(x: torch.Tensor, n_repeats: int) -> torch.Tensor:
+        """
+        Repeats a tensor along a new dimension.
+        
+        Args:
+            x (torch.Tensor): Input tensor to repeat
+            n_repeats (int): Number of times to repeat
+            
+        Returns:
+            torch.Tensor: Repeated tensor
+        """
         rep = torch.ones(n_repeats, 1,  device=x.device).t()
         x = x.float()
         rep = rep.float()
@@ -11,7 +53,20 @@ def StructureStitchingLayer(inputs, H_tf, target_height, target_width):
         x = x.int()
         return x.reshape(-1)
 
-    def _interpolate(im, x, y, out_size):
+    def _interpolate(im: torch.Tensor, x: torch.Tensor, y: torch.Tensor, 
+                    out_size: Tuple[int, int]) -> torch.Tensor:
+        """
+        Performs bilinear interpolation on the input image.
+        
+        Args:
+            im (torch.Tensor): Input image tensor of shape [batch_size, channels, height, width]
+            x (torch.Tensor): X coordinates for interpolation
+            y (torch.Tensor): Y coordinates for interpolation
+            out_size (Tuple[int, int]): Desired output size (height, width)
+            
+        Returns:
+            torch.Tensor: Interpolated image tensor
+        """
         num_batch = im.size(0)
         height = im.size(2)
         width = im.size(3)
@@ -67,7 +122,18 @@ def StructureStitchingLayer(inputs, H_tf, target_height, target_width):
         output = output.permute(0, 3, 1, 2)
         return output
 
-    def _meshgrid(height, width, image_tf):
+    def _meshgrid(height: int, width: int, image_tf: torch.Tensor) -> torch.Tensor:
+        """
+        Creates a meshgrid for image transformation.
+        
+        Args:
+            height (int): Desired grid height
+            width (int): Desired grid width
+            image_tf (torch.Tensor): Reference image for device and shape information
+            
+        Returns:
+            torch.Tensor: Meshgrid tensor of shape [3, height*width]
+        """
         device = image_tf.device
         shift = (height - image_tf.shape[2]) / 2.
         x_t = torch.matmul(torch.ones(height, 1, device=device),
@@ -82,7 +148,17 @@ def StructureStitchingLayer(inputs, H_tf, target_height, target_width):
         grid = torch.cat([x_t_flat, y_t_flat, ones], 0)
         return grid
 
-    def _transform(image_tf, H_tf):
+    def _transform(image_tf: torch.Tensor, H_tf: torch.Tensor) -> torch.Tensor:
+        """
+        Applies homography transformation to an image.
+        
+        Args:
+            image_tf (torch.Tensor): Input image tensor
+            H_tf (torch.Tensor): Homography transformation matrix
+            
+        Returns:
+            torch.Tensor: Transformed image tensor
+        """
         num_batch = image_tf.size(0)
         num_channels = image_tf.size(1)
         H_tf = H_tf.reshape(-1, 3, 3)

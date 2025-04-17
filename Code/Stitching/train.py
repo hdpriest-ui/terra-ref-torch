@@ -71,12 +71,14 @@ def main():
         load_checkpoint(const.CHECKPOINT, model, optimizer)
 
     overall_iteration = 0
+    training_set_size = len(train_loader)
+    validation_set_size = len(val_loader)
     best_loss = float("inf")
     for epoch in range(const.ITERATION):
         logger.info(f"Starting epoch {epoch + 1}/{const.ITERATION}")
         model.train()
         epoch_loss = 0
-        set_size = len(train_loader)
+        model.h_estimator.eval() ## Freeze the homography estimator
         # Training Loop
         for batch_idx, (inputs, targets) in enumerate(train_loader):
             input1, input2 = inputs
@@ -94,10 +96,10 @@ def main():
             epoch_loss += loss.item()
             overall_iteration += 1
             if (batch_idx + 1) % 1000 == 0:
-                logger.info(f"Epoch [{epoch + 1}/{const.ITERATION}], Step [{batch_idx + 1}/{len(train_loader)}], Loss: {loss.item():.4f}")
+                logger.info(f"Epoch [{epoch + 1}/{const.ITERATION}], Step [{batch_idx + 1}/{training_set_size}], Loss: {loss.item():.4f}")
                 writer.add_scalar('Loss/train', loss.item(), overall_iteration)
 
-        epoch_loss /= set_size
+        epoch_loss /= training_set_size
         logger.info(f"Epoch [{epoch + 1}/{const.ITERATION}] Average Training Loss: {epoch_loss:.4f}")
 
         # Validation Loop
@@ -120,7 +122,7 @@ def main():
                     save_images_to_tensorboard(writer, outputs, "Validation/FinalStitched", epoch + 1)
                     save_images_to_tensorboard(writer, targets, "Validation/Targets", epoch + 1)
 
-        val_loss /= len(val_loader)
+        val_loss /= validation_set_size
         logger.info(f"Epoch [{epoch + 1}/{const.ITERATION}] Validation Loss: {val_loss:.4f}")
         writer.add_scalar('Loss/validation', val_loss, epoch + 1)
 
