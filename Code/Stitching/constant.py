@@ -1,51 +1,95 @@
 import os
 import argparse
-import configparser
 from pathlib import Path
+from PIL import Image
+import glob
+import logging
+
+# Add this line to define the log level
+LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for more detailed logs
 
 
-def get_dir(directory):
-    """
-    get the directory, if no such directory, then make it.
-
-    @param directory: The new directory.
-    """
-
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-    return directory
+# def get_dir(directory):
+#     """
+#     Create the directory if it does not exist.
+#
+#     Args:
+#         directory (str): The directory path.
+#
+#     Returns:
+#         str: The directory path.
+#     """
+#     if not os.path.exists(directory):
+#         os.makedirs(directory)
+#     return directory
 
 
 def parser_args():
+    """
+    Parse command-line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed arguments.
+    """
     parser = argparse.ArgumentParser(description='Options to run the network.')
     parser.add_argument('-g', '--gpu', type=str, default='0',
-                        help='the device id of gpu.')
-    parser.add_argument('-i', '--iters', type=int, default=1,
-                        help='set the number of iterations, default is 1')
-    parser.add_argument('-b', '--batch', type=int, default=1,
-                        help='set the batch size, default is 4.')
-    parser.add_argument('--train_folder', type=str, default='',
-                        help='set the training folder path.')
-    parser.add_argument('--test_folder', type=str, default='',
-                        help='set the testing folder path.')
-    parser.add_argument('--vgg19_folder', type=str, default='',
-                        help='set the folder containing the vgg19 model .npy file.')
-    parser.add_argument('--output_root', type=str, default='',
-                        help='set the output root folder path.')
-    parser.add_argument('--checkpoint', type=str,
-                        help='identifies a checkpoint file to load - optional.')
-    parser.add_argument('--checkpoint_number', type=str,
-                        help='identifies a checkpoint number to automatically identify a file to load - optional.')
-    # parser.add_argument('--snapshot_dir', type=str, default='',
-    #                     help='if it is folder, then it is the directory to save models, '
-    #                          'if it is a specific model.ckpt-xxx, then the system will load it for testing.')
-    # parser.add_argument('--summary_dir', type=str, default='', help='the directory to save summaries.')
-
+                        help='The device ID of the GPU.')
+    parser.add_argument('-i', '--iteration', type=int, default=1,
+                        help='Number of iterations (epochs). Default is 1.')
+    parser.add_argument('-b', '--batch_size', type=int, default=1,
+                        help='Batch size. Default is 1.')
+    parser.add_argument('--training_data_directory', type=str, required=True,
+                        help='Path to the training data directory.')
+    parser.add_argument('--test_data_directory', type=str, required=True,
+                        help='Path to the testing data directory.')
+    parser.add_argument('--output_root', type=str, required=True,
+                        help='Path to the output root directory.')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                        help='Path to a checkpoint file to load (optional).')
+    parser.add_argument('--checkpoint_number', type=str, default=None,
+                        help='Checkpoint number to automatically identify a file to load (optional).')
+    parser.add_argument('--vgg19_folder', type=str, default=None,
+                        help='Path to the folder containing the VGG19 model (optional).')
+    parser.add_argument('--learning_rate', type=float, default=0.001,
+                        help='Learning rate for the optimizer. Default is 0.001.')
+    parser.add_argument('--gradient_clip', type=float, default=None,
+                        help='Gradient clipping value. Default is None (no clipping).')
+    parser.add_argument('--homography_checkpoint', type=str, default=None,
+                        help='Required path to homography output checkpoint file.')
     return parser.parse_args()
 
 
+def determine_image_size(data_directory, num_samples=50):
+    """
+    Dynamically determine the image size by peeking at the first few images in the training directory.
+
+    Args:
+        data_directory (str): Path to the training data directory.
+        num_samples (int): Number of images to sample for determining the size.
+
+    Returns:
+        tuple: (height, width) of the images.
+    """
+    input1_dir = os.path.join(data_directory, "input1")
+    image_paths = glob.glob(os.path.join(input1_dir, "*.*"))[:num_samples]
+
+    if not image_paths:
+        raise ValueError(f"No images found in the directory: {input1_dir}")
+
+    heights, widths = [], []
+    for image_path in image_paths:
+        with Image.open(image_path) as img:
+            heights.append(img.height)
+            widths.append(img.width)
+
+    # Return the most common height and width
+    return int(sum(heights) / len(heights)), int(sum(widths) / len(widths))
+
+
 class Const(object):
+    """
+    A class to define constant variables.
+    """
     class ConstError(TypeError):
         pass
 
@@ -54,54 +98,48 @@ class Const(object):
 
     def __setattr__(self, name, value):
         if name in self.__dict__:
-            raise self.ConstError("Can't change const.{}".format(name))
+            raise self.ConstError(f"Cannot change constant '{name}'.")
         if not name.isupper():
-            raise self.ConstCaseError('const name {} is not all uppercase'.format(name))
-
+            raise self.ConstCaseError(f"Constant name '{name}' is not all uppercase.")
         self.__dict__[name] = value
 
     def __str__(self):
-        _str = '<================ Constants information ================>\n'
+        _str = '<================ Constants Information ================>\n'
         for name, value in self.__dict__.items():
-            print(name, value)
-            _str += '\t{}\t{}\n'.format(name, value)
-
+            _str += f'\t{name}: {value}\n'
         return _str
 
 
+# Parse arguments
 args = parser_args()
 const = Const()
 
-# inputs constants
-const.TRAIN_FOLDER = args.train_folder
-const.TEST_FOLDER = args.test_folder
+# Input directories
+const.TRAINING_DATA_DIRECTORY = args.training_data_directory
+const.TEST_DATA_DIRECTORY = args.test_data_directory
 
+# GPU settings
 const.GPU = args.gpu
 
-const.BATCH_SIZE = args.batch
-const.ITERATIONS = args.iters
-
-const.OUTPUT_ROOT = Path(get_dir(args.output_root))
+# Training parameters
+const.BATCH_SIZE = args.batch_size
+const.ITERATION = args.iteration
+const.LEARNING_RATE = args.learning_rate
+const.GRADIENT_CLIP = args.gradient_clip
+const.HOMOGRAPHY_CHECKPOINT = args.homography_checkpoint
+# Dynamically determine image size
+const.HEIGHT, const.WIDTH = determine_image_size(const.TRAINING_DATA_DIRECTORY)
+# Output directories
+const.OUTPUT_ROOT = Path(str(args.output_root))
+const.SUMMARY_DIR = Path(str(Path(const.OUTPUT_ROOT, "summary")))
+const.SNAPSHOT_DIR = Path(str(Path(const.OUTPUT_ROOT, "snapshot")))
+const.RESULT_DIR = Path(str(Path(const.OUTPUT_ROOT, "result")))
+# Checkpoint settings
 const.CHECKPOINT = args.checkpoint
-summary_base = get_dir(Path(const.OUTPUT_ROOT, "summary"))
-snapshot_base = get_dir(Path(const.OUTPUT_ROOT, "snapshot"))
-
-const.SUMMARY_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "summary", "stitch")))
-const.SNAPSHOT_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "snapshot", "stitch")))
-const.HOMOGRAPHY_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "snapshot", "homography")))
-# const.STITCH_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "summary", "stitch")))
-const.RESULT_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "result")))
 if args.checkpoint_number:
     const.CHECKPOINT_NUMBER = str(int(args.checkpoint_number))
-# const.CHECKPOINT_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "checkpoints")))
 
-# if args.snapshot_dir:
-#     const.SNAPSHOT_DIR = get_dir(args.snapshot_dir)
-#
-# if args.summary_dir:
-#     const.SUMMARY_DIR = get_dir(args.summary_dir)
-
+# VGG19 model directory
 if args.vgg19_folder:
-    const.VGG19_DIR = get_dir(args.vgg19_folder)
-
+    const.VGG19_DIR = Path(args.vgg19_folder)
 

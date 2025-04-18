@@ -1,128 +1,167 @@
 import os
+from random import random, seed
+
+import numpy as np
 import torch
 import torch.nn as nn
+import torch.multiprocessing as mp
+from sympy.vector import gradient
 from torch.utils.data import DataLoader
-import torchvision
-import torchvision.transforms as transforms
-import torchvision.transforms.functional
 from constant import const
 from pathlib import Path
-import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
 from models import HomographyEstimator
 from utilities import HomographyInputLoader
 
-# C:\Users\hdpriest\Large_datasets\terra-ref\RGB
-
 # Device will determine whether to run the training on GPU or CPU.
 os.environ['CUDA_VISIBLE_DEVICES'] = const.GPU
 
 def device():
-    the_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # print(f"Running in context: {the_device}")
-    return the_device
+    cuda = torch.cuda.is_available()
+    if cuda:
+        torch.set_default_device('cuda')
+        the_device = torch.device('cuda')
+        return the_device
+    else:
+        the_device = torch.device('cpu')
+        return the_device
 
 this_device = device()
-
+print(f"Running in context: {this_device}")
 
 train_folder = const.TRAIN_FOLDER
 test_folder = const.TEST_FOLDER
-batch_size = const.BATCH_SIZE
+batch_size = const.BATCH_SIZE # param
 iterations = const.ITERATIONS
-train_dataset_tile_height = 128
-train_dataset_tile_width = 128
+learning_rate_set = const.LEARNING_RATE  # param
+epsilon_set = const.EPSILON # param
+gradient_clip_level = const.GRADIENT_CLIP
+train_dataset_tile_height = 128 # param
+train_dataset_tile_width = 128 # param
 
-# C+P with updates from Digital Ocean
-###################
-#  DATA LOGISTICS #
-###################
-all_transforms = transforms.Compose([transforms.Resize((32,32)),
-                                     transforms.ToTensor(),
-                                     transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
-                                                          std=[0.2023, 0.1994, 0.2010])
-                                     ])
-# Create Training dataset
-train_dataset = HomographyInputLoader(train_folder, resize_height=train_dataset_tile_height, resize_width=train_dataset_tile_width)
-test_dataset = HomographyInputLoader(test_folder, resize_height=train_dataset_tile_height, resize_width=train_dataset_tile_width)
+# utilized for testing/dev
+remove_randomness = False
+if remove_randomness:
+    torch.manual_seed(12345)
+    np.random.seed(12345)
+    seed(12345)
+    torch.backends.cudnn.benchmark = False
 
-# Make data loaders
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+# torch.backends.cudnn.enabled = False
 
+def main():
+    ###################
+    #  DATA LOGISTICS #
+    ###################
+    # Create Training dataset
+    train_dataset = HomographyInputLoader(train_folder, resize_height=train_dataset_tile_height, resize_width=train_dataset_tile_width)
+    test_dataset = HomographyInputLoader(test_folder, resize_height=train_dataset_tile_height, resize_width=train_dataset_tile_width)
 
-# train_features, train_labels = next(iter(train_dataloader))
-# print_image = (train_features[0] + 1) * 127.5
-# img1 = torchvision.transforms.functional.to_pil_image(torch.squeeze((train_features[0] + 1) * 127.5, dim=0))
-# plt.imshow(img1, cmap="gray")
-# plt.show()
-# img2 = torchvision.transforms.functional.to_pil_image(torch.squeeze((train_features[1] + 1) * 127.5, dim=0))
-# plt.imshow(img2, cmap="gray")
-# plt.show()
+    # Make data loaders
 
-# get sets of images - with X overlap, y overlap, corner overlap, data loaded into py tensors
-#
-#
-# 
-#
-#
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, generator=torch.Generator(device()), num_workers=3, prefetch_factor=64)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, generator=torch.Generator(device()), num_workers=3, prefetch_factor=64)
+
+    # train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=3, prefetch_factor=64)
+    # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=3, prefetch_factor=64)
 
 
-###################
-#    TRAINING     #
-###################
+    ###################
+    #    TRAINING     #
+    ###################
 
-HomographyModel = HomographyEstimator()
-HomographyModel.to(device())
-# Set Loss function with criterion
-# h_loss = tf.reduce_mean(input_tensor=tf.abs((train_outputs - train_h) ** 2))
-criterion = nn.MSELoss()
+    HomographyModel = HomographyEstimator(batch_size=batch_size)
+    HomographyModel.to(device())
 
-# g_lrate = tf.compat.v1.train.piecewise_constant(g_step, boundaries=[500000], values=[0.00005, 0.000005])
+    # criterion = nn.MSELoss()
+    def criterion(output, label):
+        # i can't even describe how much this shouldn't matter.
+        interstitial = output - label
+        interstitial1 = interstitial ** 2
+        interstitial2 = torch.abs(interstitial1)
+        this_loss = torch.mean(interstitial2)
+        return this_loss
 
-# Set optimizer with optimizer
-learning_rate_set=0.00005
-optimizer = torch.optim.Adam(HomographyModel.parameters(), lr=learning_rate_set)
-writer = SummaryWriter(log_dir=str(const.SUMMARY_DIR))
+    # Set optimizer with optimizer
+    optimizer = torch.optim.Adam(HomographyModel.parameters(), lr=learning_rate_set, eps=epsilon_set, weight_decay=1e-5)
+    writer = SummaryWriter(log_dir=str(const.SUMMARY_DIR))
 
-total_step = len(train_dataloader)
-epoch_save_number = 2
-epoch_update_number = 1
-for epoch in range(const.ITERATIONS):
-    print(f"Beginning epoch: {epoch}")
-    update_iteration_number = 10
-    for i, (images, labels) in enumerate(train_dataloader):
-        # Move tensors to the configured device
-        image_a = images[0]
-        image_b = images[1]
-        labels = torch.mean(input=labels, dim=2, keepdim=False)
-        image_a = image_a.to(device())
-        image_b = image_b.to(device())
-        labels = labels.to(device())
+    total_step = len(train_dataloader)
+    iter_save_number = 25000
+    iter_update_number = 1000
+    epoch_max = 5000
+    current_iter = 0
+    min_validation_loss = np.inf
+    HomographyModel.train()
+    w_previous = None
+    for epoch in range(epoch_max):
+        if current_iter >= const.ITERATIONS:
+            break
+        print(f"Beginning epoch: {epoch}")
+        for i, (images, labels) in enumerate(train_dataloader):
+            # Move tensors to the configured device
+            if current_iter >= const.ITERATIONS:
+                break
+            image_a = images[1]
+            image_b = images[0]
+            image_a = image_a.to(device())
+            image_b = image_b.to(device())
+            labels = labels.to(device())
 
-        # Forward pass
-        outputs = HomographyModel(image_a, image_b)
-        loss = criterion(outputs, labels)
-        if i % update_iteration_number == 0:
-            print(f'Homography Training : Step {i}, lr = {int(learning_rate_set)}')
-            print(f'                 Global      Loss : {int(loss)}')
+            outputs, training_warp_gt = HomographyModel(image_a, image_b, labels, is_stitching=False)
+            labels = torch.mean(labels, dim=2)
+            loss = criterion(outputs.flatten(), labels.flatten())
+            loss.backward()
+            if gradient_clip_level is not None:
+                torch.nn.utils.clip_grad_norm_(HomographyModel.parameters(), gradient_clip_level)
 
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    if epoch % epoch_update_number == 0:
-        print(f"Epoch [{epoch}/{const.ITERATIONS}] :: Loss: {loss.item()}")
-        writer.add_scalar('Loss/train', loss.item(), epoch)
+            optimizer.step()
+            optimizer.zero_grad()
 
-    if epoch % epoch_save_number == 0:
-        print(f"Saving model at epoch: {epoch}")
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': HomographyModel.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-        }, str(Path(const.SNAPSHOT_DIR, "homography_checkpoint.pth")))
+            if (current_iter % iter_update_number == 0) or (current_iter == const.ITERATIONS):
+                print(f"Iteration [{current_iter}/{const.ITERATIONS}] :: Loss: {loss.item()}")
+                writer.add_scalar('Loss/train', loss.item(), current_iter)
 
-# const.SUMMARY_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "summary", "homography")))
-# const.SNAPSHOT_DIR = Path(get_dir(Path(const.OUTPUT_ROOT, "snapshot", "homography")))
+            if (current_iter % iter_save_number == 0) or (current_iter == const.ITERATIONS):
+                print(f"Saving model at iteration: {current_iter}")
+                torch.save({
+                    'iteration': current_iter,
+                    'epoch': epoch,
+                    'model_state_dict': HomographyModel.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': loss,
+                }, str(Path(const.SNAPSHOT_DIR, "homography_checkpoint.pth")))
+            current_iter = current_iter + 1
+
+        validation_loss = 0.0
+        HomographyModel.eval()
+        with torch.no_grad():
+            for i, (images, labels) in enumerate(test_dataloader):
+                image_a = images[1]
+                image_b = images[0]
+                image_a = image_a.to(device())
+                image_b = image_b.to(device())
+                labels = labels.to(device())
+
+                outputs, test_warp_gt = HomographyModel(image_a, image_b, labels, is_stitching=False)
+                labels = torch.mean(labels, dim=2)
+                loss = criterion(outputs.flatten(), labels.flatten())
+                validation_loss += loss.item()
+            mean_validation_loss = validation_loss / total_step
+            print(f'Epoch {epoch} Validation Loss: {validation_loss / total_step}')
+            if validation_loss < min_validation_loss:
+
+                print(f'Overall validation loss improved: {validation_loss:.6f} < {min_validation_loss:.6f}')
+                torch.save({
+                    'iteration': current_iter,
+                    'epoch': epoch,
+                    'model_state_dict': HomographyModel.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': validation_loss / total_step,
+                }, str(Path(const.SNAPSHOT_DIR, f"homography_checkpoint_epoch{epoch}.pth")))
+                min_validation_loss = validation_loss
+
+if __name__ == '__main__':
+    mp.set_start_method('spawn')
+    main()
