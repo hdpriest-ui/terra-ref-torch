@@ -98,6 +98,8 @@ def main():
             if (batch_idx + 1) % 1000 == 0:
                 logger.info(f"Epoch [{epoch + 1}/{const.ITERATION}], Step [{batch_idx + 1}/{training_set_size}], Loss: {loss.item():.4f}")
                 writer.add_scalar('Loss/train', loss.item(), overall_iteration)
+            if batch_idx == 1:
+                writer.add_graph(model)
 
         epoch_loss /= training_set_size
         logger.info(f"Epoch [{epoch + 1}/{const.ITERATION}] Average Training Loss: {epoch_loss:.4f}")
